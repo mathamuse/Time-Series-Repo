@@ -1,0 +1,149 @@
+################### HEADERS AND INCLUSIONS ##################
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt 
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.graphics.tsaplots import plot_pacf
+from statsmodels.tsa.arima.model import ARIMA
+import statsmodels.tsa.api as smt
+
+######################### FILE INPUT #########################
+df= pd.read_csv('C:/...File ..../Data.csv')
+print(df)
+
+df.drop(df.index[:2], inplace=True)   # mild data cleaning 
+#print(df)                            # mainly for testing
+
+df.reset_index(drop=True,inplace=True)
+#print(df)                            # mainly for testing
+
+df['Close']=df['Close'].astype(float) # convert to numeric 
+df.plot()                             # plot the data - preliminary   
+plt.show()
+#'''
+###################### SPLIT DATA INTO TRAIN and TEST ################
+msk = len(df)-5
+df_train = df[0:msk].copy()
+df_test = df[msk:len(df)].copy()
+
+######################## RUN AUGMENTED DICKEY-FULLER TEST ############
+######################### for stationarity ###########################
+
+result = adfuller(df['Close'])
+print("\n Running ADF Test for stationarity on Time Series \n")
+print('ADF Statistic: %f' % result[0])
+print('p-value: %f' % result[1])
+print('Critical Values:')
+for key, value in result[4].items():
+ print('\t%s: %.3f' % (key, value))    
+
+################### PERFORM DIFFERENCING ##############################
+print("\n Series is not Stationary. Performing Differencing \n")
+
+difs = df['Close'].diff()
+difs = difs.dropna()    
+
+################## Check again ########################################
+result = adfuller(difs)
+print("\n Running ADF Test for stationarity on Differenced Time Series \n")
+print('ADF Statistic: %f' % result[0])
+print('p-value: %f' % result[1])
+print('Critical Values:')
+for key, value in result[4].items():
+ print('\t%s: %.3f' % (key, value))    
+
+difs.plot()                                    #  check plots just to be sure 
+plt.show()
+
+###################### PLOT THE AUTOCORRELATION ##########################
+######################  PLOT PARTIAL AUTOCORRELATION #####################
+####################### find the model fit ###############################
+plot_acf(difs)                                 # plot the Autocorrelation
+                                               # helps to get q term
+plot_pacf(difs)                                # plot the Partial Autocorrelation
+                                               # helps to get p term
+
+###################### run the following code to find the best model ######
+##############               optimize by choosing model with least AIC/BIC
+#'''
+# Store the p terms from the plot in p array
+'''
+p_arr = [1,3,5,7,16]
+
+# Store the p terms from the plot in q array
+q_arr=[1,9,11,16]
+
+for i in p_arr:
+    for j in q_arr:
+        tmp_mdl = smt.ARIMA(difs, order=(i,0,j)).fit()
+        tmp_aic = tmp_mdl.aic
+        tmp_bic=tmp_mdl.bic
+        print("Model ORDER is -",i,",",j,"- Model aic : " , tmp_aic, " Model BIC : ", tmp_bic)
+
+'''
+#'''
+############################ FIT THE MODEL ##################################
+model = ARIMA(df_train['Close'],order =(3,1,1))
+model_fit=model.fit()
+
+print(model_fit.summary())                    #show summary
+
+residuals=model_fit.resid[1:]                 #collect residuals
+fig,ax = plt.subplots(1,2)                    # plot residuals
+residuals.plot(title='Residuals',ax=ax[0])
+residuals.plot(title='Density',kind='kde',ax=ax[1])
+model_fit.plot_diagnostics(figsize=(15,12))                           
+                                             # check stationarity of residuals
+#'''
+########################################################################
+##                                 OUTPUT                             ##
+########################################################################
+predictions = model_fit.predict(start=0,end=len(df_train))
+                                              # fit the model
+forecast_test = model_fit.forecast(len(df_test))
+                                             # forecast the model
+
+##################### Compare model Predictions with train data #############
+temp=pd.DataFrame()
+temp['Original'] = df_train['Close']
+temp['Predicted'] = predictions.astype(float)
+print(temp)                                # mainly for testing
+##################  Estimate Mean Square Error for Quality Control #####
+
+mse = np.square(np.subtract(temp['Original'],temp['Predicted']).mean())
+print("MSE of Training of model is:", mse)
+
+###################### Compare the Forecast with the test data ##############
+output=pd.DataFrame()
+output['Forecast'] = forecast_test
+output['Test'] = df_test['Close'].astype(float)
+
+print(output)                              # mainly for testing
+
+##################  Estimate Mean Square Error for Quality Control #####
+
+mse = np.square(np.subtract(output['Forecast'],output['Test']).mean())
+print("MSE of testing of data is:", mse)
+
+########################### OVERALL PLOT ##########################
+plt.figure(figsize=(12,8))
+plt.plot(df.index,df['Close'],label="JHX",color="orange")
+plt.plot(predictions.index,predictions,label="Model Pred",color="red")
+plt.plot(forecast_test.index,forecast_test,label="Model Fore",color="Black")
+plt.title("ARIMA plot")
+plt.xlabel("Date")
+plt.ylabel("Value")
+plt.legend()
+plt.show()
+
+################## Plot Forecast data #################################
+plt.figure(figsize=(12,8))
+plt.plot(output.index,output['Forecast'],label="Forecast",color="orange")
+plt.plot(output.index,output['Test'],label="Test",color="red")
+plt.title("Forecast plot")
+plt.xlabel("Date")
+plt.ylabel("Value")
+plt.legend()
+plt.show()
+#'''
