@@ -1,0 +1,91 @@
+############################## INCLUSIONS AND HEADERS #########################
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+############################## Read file and plot #############################
+csv_dataset = pd.read_csv("C:/......  data ............/SHEL Close 2009-2013.csv")
+
+print(csv_dataset)                               # mainly for testing
+test_length = 1
+
+actual_val = csv_dataset.tail(test_length)        # store the last values 
+actual_val = actual_val['Close'].values
+actual_val = actual_val[0]
+
+csv_dataset = csv_dataset.iloc[:-(test_length)]   # drop the last 5 from data
+
+#actual_val = actual_val['Close'].values 
+print(actual_val)                                 # mainly for testing
+
+#print(csv_dataset)                               # mainly for testing
+
+csv_dataset.plot()                                # plot for preliminary analysis
+plt.show()
+
+################### FINDING OPTIMAL ALPHA #####################################
+################### Do a grid search for alpha ################################
+#'''
+optimal_alpha = None
+best_mse = None
+db = csv_dataset['Close']
+mean_results_for_all_possible_alpha_values = np.zeros(9)
+################ First find values upto first decimal #########################
+for alpha in range(0, 9):                               #run a loop
+    pt = np.mean(db[:][0:5])                            #generate series  
+    mean_for_alpha = np.zeros(len(db))                   
+    mean_for_alpha[0] = np.power(db[0] - pt, 2)         # square difference
+    for i in range(1, len(db)):
+        pt = pt + ((alpha + 1) * 0.1) * (db[i - 1] - pt) #run sequence for alpha 
+        mean_for_alpha[i] = np.power(db[i] - pt, 2)      # store it in array
+    mean_results_for_all_possible_alpha_values[alpha] = np.mean(mean_for_alpha)
+    print("MSE for alpha ",(alpha+1)*0.1," is",mean_results_for_all_possible_alpha_values[alpha])
+
+optimal_alpha = (np.argmin(mean_results_for_all_possible_alpha_values) + 1) * 0.1
+best_mse = np.min(mean_results_for_all_possible_alpha_values) #find optimal mean square error(MSE)
+print("Best MSE = %s" % best_mse)
+print("Optimal alpha = %s" % optimal_alpha)
+#'''
+############### Find second decimal with grid search ##########################
+################ repeating same on next level #################################
+for alpha in range(0, 9):
+    pt = np.mean(db[:][0:5])
+    mean_for_alpha = np.zeros(len(db))
+    mean_for_alpha[0] = np.power(db[0] - pt, 2)
+    for i in range(1, len(db)):
+        aleph = optimal_alpha + (alpha+1)*0.01
+        pt = pt + (aleph) * (db[i - 1] - pt)
+        mean_for_alpha[i] = np.power(db[i] - pt, 2)
+    mean_results_for_all_possible_alpha_values[alpha] = np.mean(mean_for_alpha)
+    print("MSE for aleph ",(aleph)," is",mean_results_for_all_possible_alpha_values[alpha])
+
+optimal_aleph = optimal_alpha + (np.argmin(mean_results_for_all_possible_alpha_values) + 1) * 0.01
+best_mse = np.min(mean_results_for_all_possible_alpha_values)
+print("Best MSE = %s" % best_mse)
+print("Optimal alpha = %s" % optimal_aleph)
+
+#'''
+################### NEXT PREDICTION #############################
+#'''
+pt = np.mean(db[:][0:5])
+for i in range(1, len(db) + 1):
+    pt = pt + optimal_aleph * (db[i - 1] - pt)
+print("Next observation = %s" % pt)
+print("Actual value is: " ,actual_val)
+#'''
+################### SMOOTHING FUNCTION #############################
+#'''
+forecast = np.zeros(len(db) + 1)
+pt = np.mean(db[:][0:5])
+forecast[0] = pt
+for i in range(1, len(db) + 1):
+    pt = pt + optimal_alpha * (db[i - 1] - pt)
+    forecast[i] = pt
+#'''    
+################### PLOTTING THE DATA #############################
+#'''
+plt.plot(db[:],label = 'real data')
+plt.plot(forecast, label = 'forecast')
+plt.legend()
+plt.show()
+#'''
